@@ -1,0 +1,529 @@
+﻿@{
+    ViewData["Title"] = "Sea Battle";
+}
+<script src="https://code.jquery.com/jquery-3.6.3.js"></script>
+<button class="btn btn-danger" id="disconnect-btn" onclick="leave()">Exit</button>
+
+<style>
+    .circle {
+        position: absolute;
+        top: 10%;
+        left: 10%;
+        width: 80%;
+        height: 80%;
+        pointer-events: none;
+        fill: none;
+        stroke: green;
+        stroke-width: 10;
+    }
+
+    .cross {
+        position: absolute;
+        top: 10%;
+        left: 10%;
+        width: 80%;
+        height: 80%;
+        pointer-events: none;
+    }
+
+    #myGameField > div > div {
+        position: relative;
+    }
+
+    #opponentGameField > div > div {
+        position: relative;
+    }
+
+    .ship {
+        height: 30px;
+        background-color: black;
+        display: flex;
+        margin: 5px;
+        color: white;
+    }
+</style>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-3">
+            <h3>Players in Lobby</h3>
+            <ul class="list-group" id="player-list"></ul>
+            <h6 id="waitField"></h6>
+            <button class="btn btn-primary" id="start" onclick="startGame(this)" style="display: none;">Start game</button>
+            <div id='ships-container' style="display: none;">
+                <div class="ship" id="41" style="width: 120px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="31" style="width: 90px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="32" style="width: 90px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="21" style="width: 60px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="22" style="width: 60px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="23" style="width: 60px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="11" style="width: 30px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="12" style="width: 30px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="13" style="width: 30px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+                <div class="ship" id="14" style="width: 30px;"
+                     draggable="true" onclick="rotate(this)" ondragstart="handleDragStart(event)">
+                    hor
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <h3>Sea Battle</h3>
+            <div id="turn-indicator"></div>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Your field</h6>
+                    <div id="myGameField">
+                        @for (int i = 0; i < 10; i++)
+                        {
+                            <div style="display: flex; flex-direction: row;">
+                                @for (int j = 0; j < 10; ++j)
+                                {
+                                    <div id="@(10 * i + j)" onclick="removeShip(this)" style="background-color: white; flex: 1; padding: 0; margin: 0; aspect-ratio: 1/1; border: 1px solid black;" ondrop="handleDrop(event)" ondragover="handleDragOver(event)"></div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6>Opponent's field</h6>
+                    <div id="opponentGameField">
+                        @for (int i = 0; i < 10; i++)
+                        {
+                            <div style="display: flex; flex-direction: row;">
+                                @for (int j = 0; j < 10; ++j)
+                                {
+                                    <div onclick="mark(this)" id="@(10 * i + j)" style="flex: 1; padding: 0; margin: 0; aspect-ratio: 1/1; border: 1px solid black;"></div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <h3 id="resultLine"></h3>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        var fieldLength = 10;
+        var shipsNumber = 10;
+        var placedShips = [];
+        function rotate(ship) {
+            ship.innerText = (ship.innerText == "hor") ? "ver" : "hor";
+        }
+        function removeShip(ship) {
+            var startButton = document.getElementById("start");
+            if (activeGame || ship.style.backgroundColor == "white" || startButton.style.display == "none" || startButton.innerHTML != "Confirm placement") {
+                return;
+            }
+            var field = document.getElementById("myGameField");
+            var cellIdInit = parseInt(ship.id);
+            var cellId = cellIdInit;
+            var container = document.getElementById("ships-container");
+            var shipElement = container.querySelector('[id="' + ship.shipId + '"]');
+            var color = ship.style.backgroundColor;
+            while (cellId - fieldLength >= 0 &&
+                field.querySelector('[id="' + (cellId - fieldLength) + '"]').style.backgroundColor == color) {
+                field.querySelector('[id="' + (cellId - fieldLength) + '"]').style.backgroundColor = "white";
+                cellId -= fieldLength;
+            }
+            cellId = cellIdInit;
+            while (cellId + fieldLength < fieldLength * fieldLength &&
+                field.querySelector('[id="' + (cellId + fieldLength) + '"]').style.backgroundColor == color) {
+                field.querySelector('[id="' + (cellId + fieldLength) + '"]').style.backgroundColor = "white";
+                cellId += fieldLength;
+            }
+            cellId = cellIdInit;
+            while (cellId % fieldLength != (fieldLength - 1) &&
+                field.querySelector('[id="' + (cellId + 1) + '"]').style.backgroundColor == color) {
+                field.querySelector('[id="' + (cellId + 1) + '"]').style.backgroundColor = "white";
+                cellId += 1;
+            }
+            cellId = cellIdInit;
+            while (cellId % fieldLength != 0 &&
+                field.querySelector('[id="' + (cellId - 1) + '"]').style.backgroundColor == color) {
+                field.querySelector('[id="' + (cellId - 1) + '"]').style.backgroundColor = "white";
+                cellId -= 1;
+            }
+            ship.style.backgroundColor = "white";
+            shipElement.style.display = "block";
+
+            placedShips = placedShips.filter(object => {
+                return object.id !== ship.shipId;
+            });
+        }
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.id);
+        }
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function isValidCell(cellId, field) {
+            var maxId = fieldLength * fieldLength;
+            var valid = field.querySelector('[id="' + cellId + '"]').style.backgroundColor == "white";
+
+            if (cellId + fieldLength < maxId &&
+                field.querySelector('[id="' + (cellId + fieldLength) + '"]').style.backgroundColor != "white" ||
+                cellId - fieldLength >= 0 &&
+                field.querySelector('[id="' + (cellId - fieldLength) + '"]').style.backgroundColor != "white" ||
+                cellId % fieldLength != (fieldLength - 1) &&
+                field.querySelector('[id="' + (cellId + 1) + '"]').style.backgroundColor != "white" ||
+                cellId % fieldLength != 0 &&
+                field.querySelector('[id="' + (cellId - 1) + '"]').style.backgroundColor != "white" ||
+                cellId + fieldLength < maxId && cellId % fieldLength != (fieldLength - 1) &&
+                field.querySelector('[id="' + (cellId + fieldLength + 1) + '"]').style.backgroundColor != "white" ||
+                cellId + fieldLength < maxId && cellId % fieldLength != 0 &&
+                field.querySelector('[id="' + (cellId + fieldLength - 1) + '"]').style.backgroundColor != "white" ||
+                cellId - fieldLength >= 0 && cellId % fieldLength != (fieldLength - 1) &&
+                field.querySelector('[id="' + (cellId - fieldLength + 1) + '"]').style.backgroundColor != "white" ||
+                cellId - fieldLength >= 0 && cellId % fieldLength != 0 &&
+                field.querySelector('[id="' + (cellId - fieldLength - 1) + '"]').style.backgroundColor != "white") {
+                valid = false;
+            }
+            return valid;
+        }
+
+        function handleDrop(e) {
+            const id = e.dataTransfer.getData('text');
+            const draggableElement = document.getElementById(id);
+            if (draggableElement == null || draggableElement.className != "ship") {
+                return;
+            }
+            const dropCell = e.target;
+            const ship = document.querySelector("." + draggableElement.className);
+            const shipStyle = window.getComputedStyle(ship);
+            const targetColor = shipStyle.getPropertyValue('background-color');
+            var shipLength = parseInt(id[0]);
+            var dropCellId = parseInt(dropCell.id);
+            var orientation = draggableElement.innerText;
+            var field = document.getElementById("myGameField");
+            var valid = true;
+            if (orientation == "hor") {
+                if (dropCellId + shipLength - 1 < Math.ceil((dropCellId + 1) / 10) * 10) {
+                    for (var cellId = dropCellId; cellId < dropCellId + shipLength; ++cellId) {
+                        if (!isValidCell(cellId, field)) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                } else {
+                    valid = false;
+                }
+            } else {
+                if (dropCellId + (shipLength - 1) * fieldLength < fieldLength * fieldLength) {
+                    for (var i = 0; i < shipLength; i++) {
+                        if (!isValidCell(dropCellId + fieldLength * i, field)) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                } else {
+                    valid = false;
+                }
+            }
+
+            if (valid) {
+                var startCoord = getCoordById(dropCellId);
+                if (orientation == "hor") {
+                    var endCoord = getCoordById(dropCellId + shipLength - 1);   
+                    for (var cellId = dropCellId; cellId < dropCellId + shipLength; ++cellId) {
+                        var elem = field.querySelector('[id="' + cellId + '"]');
+                        elem.style.backgroundColor = targetColor;
+                        elem.shipId = id;
+                    }
+                } else {
+                    var endCoord = getCoordById(dropCellId + fieldLength * (shipLength - 1));   
+                    for (var i = 0; i < shipLength; i++) {
+                        var elem = field.querySelector('[id="' + (dropCellId + fieldLength * i) + '"]');
+                        elem.style.backgroundColor = targetColor;
+                        elem.shipId = id;
+                    }
+                }
+                placedShips.push({ id: id, ship: [[startCoord.row, startCoord.col], [endCoord.row, endCoord.col]] });
+                draggableElement.style.display = "none";
+            }
+        }
+
+        function getCoordById(cellId) {
+            return { row: Math.floor(cellId / fieldLength), col: cellId % fieldLength }
+        };
+    </script>
+    <script>
+        function leave() {
+            connection.stop().then(() => {
+            }).catch((error) => {
+                window.location.href = "/Home/Games";
+                console.error(`Error stopping connection: ${error}`);
+            });
+        };
+    </script>
+    <script>
+        var userName = localStorage.getItem('username');
+        var currentTurn;
+        var activeGame = false;
+        const maxPlayers = 2;
+        var readyPlayers = 0;
+
+        var url = window.location.pathname;
+        var sessionId = url.substring(url.lastIndexOf('/') + 1);
+        var connection = new signalR.HubConnectionBuilder()
+            .withUrl("/game?sessionId=" + sessionId + "&userName=" + userName)
+            .build();
+
+        connection.on("UserList", function (opponents) {
+            opponents.push({ userId: connection.connectionId, userName: userName });
+            var playerList = document.getElementById("player-list");
+            playerList.innerHTML = "";
+            opponents.forEach(function (player) {
+                var listItem = document.createElement("li");
+                listItem.classList.add("list-group-item");
+                listItem.textContent = player.userName;
+                listItem.id = player.userId;
+                playerList.appendChild(listItem);
+            });
+            if (playerList.childElementCount == maxPlayers) {
+                var wait = document.getElementById("waitField");
+                wait.innerText = "Wait for the host to start the game!";
+            }
+        });
+        connection.on("SessionNotFound", function () {
+            alert("Lobby does not exist!");
+            window.location.href = "/Home/Games";
+        });
+        connection.on("FullSession", function () {
+            alert("Lobby is full!");
+            window.location.href = "/Home/Games";
+        });
+
+        connection.on("UserConnected", function (user) {
+            var playerList = document.getElementById("player-list");
+            var listItem = document.createElement("li");
+            listItem.classList.add("list-group-item");
+            listItem.textContent = user.userName;
+            listItem.id = user.userId;
+            playerList.appendChild(listItem);
+
+            if (playerList.childElementCount == 2 && connection.connectionId == playerList.querySelector("li:first-child").id) {
+                var startButton = document.getElementById("start");
+                startButton.style.display = 'block';
+                startButton.innerHTML = "Start game";
+            } else if (playerList.childElementCount == 2) {
+                var wait = document.getElementById("waitField");
+                wait.innerText = "Wait for the host to start the game!";
+            }
+        });
+        connection.on("UserLeft", function (userId) {
+            var userLeftElement = document.getElementById(userId);
+            userLeftElement.remove();
+            var startButton = document.getElementById("start");
+            startButton.style.display = 'none';
+            var wait = document.getElementById("waitField");
+            wait.innerText = "";
+            var ships = document.getElementById("ships-container");
+            ships.style.display = "none";
+            if (activeGame) {
+                activeGame = false;
+                var res = document.getElementById("resultLine");
+                res.innerText = userName + " won since second player has left!";
+            }
+        });
+
+        // game flow
+        connection.on("GameConfigured", function () {
+            readyPlayers++;
+            var ships = document.getElementById("ships-container");
+            var wait = document.getElementById("waitField");
+            if (readyPlayers == maxPlayers) {
+                activeGame = true;
+                wait.innerText = "";
+                ships.style.display = "none";
+                updateTurnIndicator();
+            } else if (ships.style.display == "none") {
+                wait.innerText = "Wait for another player";
+            }
+        });
+        connection.on("GameStarted", function (startPlayer) {
+            flushGame();
+            var startButton = document.getElementById("start");
+            startButton.style.display = "block";
+            startButton.innerText = "Confirm placement";
+            var wait = document.getElementById("waitField");
+            wait.innerText = "Place your ships (drag and drop to place a ship " +
+                "- it starts from left upper corner; click in the list to change the orientation; " +
+            "click in the field to remove ship)";
+            currentTurn = startPlayer;
+            var ships = document.getElementById("ships-container");
+            ships.style.display = "block";
+            
+        });
+        connection.on("MoveResult", function (winner, gameEnded, move) {
+            const playerList = document.querySelector('#player-list');
+            var field;
+            if (move.player == connection.connectionId) {
+                field = "opponentGameField";
+                
+            } else {
+                field = "myGameField";
+            }
+            if (move.hit) {
+                currentTurnSymbol = "cross";
+            } else {
+                currentTurnSymbol = "circle";
+            }
+
+            markCell(field, move.row, move.col);
+            if (winner != maxPlayers) {
+                activeGame = false;
+                var res = document.getElementById("resultLine");
+                const players = Array.from(playerList.querySelectorAll('li')).map(li => li.textContent);
+                res.innerText = players[winner] + " won!";
+            } else {
+                if (!move.hit) {
+                    const players = Array.from(playerList.querySelectorAll('li')).map(li => li.id);
+                    if (players[0] == currentTurn) {
+                        currentTurn = players[1];
+                    } else {
+                        currentTurn = players[0];
+                    }
+                }
+            }
+            if (gameEnded) {
+                activeGame = false;
+                if (playerList.childElementCount == 2 && connection.connectionId == playerList.querySelector("li:first-child").id) {
+                    var startButton = document.getElementById("start");
+                    startButton.style.display = 'block';
+                    startButton.innerText = "Start game";
+                } else if (playerList.childElementCount == 2) {
+                    var wait = document.getElementById("waitField");
+                    wait.innerText = "Wait for the host to start the game!";
+                }
+                return;
+            }
+            updateTurnIndicator();
+        });
+        connection.on("WrongMove", function (message) {
+            alert("Wrong move: " + message);
+        });
+        connection.on("GameNotFound", function (message) {
+            alert("Can't make turn: " + message);
+            leave();
+        });
+
+        connection.onclose(function () {
+            window.location.href = "/Home/Games";
+        });
+        connection.start().then(function () {
+        }).catch(function (err) {
+            return console.error(err.toString());
+        });
+
+    </script>
+    <script>
+        function startGame(button) {
+            var shipsContainer = document.getElementById("ships-container");
+            if (shipsContainer.style.display == "none") {
+                connection.invoke("StartGame").catch(err => function () { console.error(err); leave(); });
+            } else {
+                if (placedShips.length != shipsNumber) {
+                    alert("Place all ships!");
+                } else {
+                    var invokeData = [];
+                    for (var coord of placedShips) {
+                        invokeData.push(coord.ship);
+                    }
+                    connection.invoke("ConfigureGame", { ships: invokeData }).catch(err => function () { console.error(err); leave(); });
+                    button.style.display = "none";
+                    shipsContainer.style.display = "none";
+                }
+            }
+        }
+    </script>
+    <script>
+        function mark(cell) {
+            if (cell.innerHTML == "" && activeGame && currentTurn == connection.connectionId) {
+                var coord = getCoordById(cell.id);
+                connection.invoke("MakeMove", coord);
+                
+            }
+        }
+        function markCell(fieldId, row, col) {
+            const cells = Array.from(document.querySelectorAll('#' + fieldId +' div div'));
+            var cell = cells[row * fieldLength + col];
+            if (currentTurnSymbol == "cross") {
+                cell.innerHTML = '<svg class="cross" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="80" height="80"><line x1="10" y1="10" x2="90" y2="90" stroke="red" stroke-width="10"/><line x1="90" y1="10" x2="10" y2="90" stroke="red" stroke-width="10"/></svg>';
+            } else {
+                cell.innerHTML = '<svg class="circle" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40" stroke="green" stroke-width="10" fill="none"/></svg>';
+            }
+        }
+
+        function flushGame() {
+            var cells = Array.from(document.querySelectorAll('#myGameField div div'));
+            for (var cell of cells) {
+                cell.innerHTML = "";
+                cell.style.backgroundColor = "white";
+            }
+            cells = Array.from(document.querySelectorAll('#opponentGameField div div'));
+            for (var cell of cells) {
+                cell.innerHTML = "";
+                cell.style.backgroundColor = "white";
+            }
+            placedShips = [];
+            showAllShips();
+            readyPlayers = 0;
+            flushResult();
+            const turnIndicator = document.getElementById("turn-indicator");
+            turnIndicator.innerText = "";
+        }
+        function updateTurnIndicator() {
+            const turnIndicator = document.getElementById("turn-indicator");
+            if (currentTurn == connection.connectionId) {
+                turnIndicator.innerText = "You turn";
+            } else {
+                turnIndicator.innerText = "Opponent's turn";
+            }
+        }
+        function flushResult() {
+            var res = document.getElementById("resultLine");
+            res.innerText = "";
+        }
+        function showAllShips() {
+            var container = document.getElementById("ships-container");
+            const ships = container.querySelectorAll('.ship');
+            ships.forEach((ship) => {
+                ship.style.display = "block";
+            });
+        }
+    </script>
+}
+

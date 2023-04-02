@@ -1,0 +1,41 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+    <script src="https://code.jquery.com/jquery-3.6.3.js"></script>
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-6 mx-auto">
+            <form>
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" class="form-control" id="username" placeholder="Enter username">
+                    <div class="invalid-feedback">Username is required.</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Enter</button>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    $(function () {
+        //var storedUsername = localStorage.getItem('username');
+        //    if (storedUsername) {
+        //        $('#username').val(storedUsername);
+        //    }
+        $('form').on('submit', function (e) {
+            e.preventDefault();
+            var username = $('#username').val();
+            if (username.trim() == '') {
+                $('#username').addClass('is-invalid');
+            } else {
+                 localStorage.setItem('username', username);
+                 window.location.href = '/Home/Games';
+            }
+        });
+
+        $('#username').on('input', function () {
+            $(this).removeClass('is-invalid');
+        });
+    });
+</script>

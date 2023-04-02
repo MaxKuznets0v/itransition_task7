@@ -1,0 +1,117 @@
+﻿@model List<Itransition7.ViewModels.LobbyTable>
+@{
+    ViewData["Title"] = "Lobbies";
+}
+<script src="https://code.jquery.com/jquery-3.6.3.js"></script>
+
+<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createLobbyModal">
+    Create lobby
+</button>
+<button type="button" class="btn btn-primary" onclick="location.reload()">
+    Refresh
+</button>
+<button type="button" class="btn btn-primary" onclick="logout()">
+    Logout
+</button>
+<div class="modal fade" id="createLobbyModal" tabindex="-1" aria-labelledby="createLobbyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createLobbyModalLabel">Create Lobby</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="createLobbyForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="lobbyName" class="col-form-label">Lobby Name:</label>
+                        <input type="text" class="form-control" id="lobbyName" placeholder="Enter lobby name" oninput="makeValid(this)" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gameSelect" class="col-form-label">Select Game:</label>
+                        <select class="form-select" id="gameSelect">
+                            <option value="0">Tic-Tac-Toe</option>
+                            <option value="1">Sea Battle</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" onclick="createLobby()">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function validateForm() {
+        var name = $('#lobbyName').val();
+        if (name.trim() == '') {
+            $('#lobbyName').addClass('is-invalid');
+            return false;
+        }
+        return true;
+    }
+        
+    function makeValid(field) {
+        field.removeClass('is-invalid');
+    }
+</script>
+
+<script>
+    var storedUsername = localStorage.getItem('username');
+    if (storedUsername == null || storedUsername == "") {
+        window.location.href = "/";
+    }
+    const lobbyNameInput = document.querySelector('#lobbyName');
+    const gameSelect = document.querySelector('#gameSelect');
+    async function createLobby() {
+        event.preventDefault();
+        if (!validateForm()) {
+            return;
+        }
+        const response = await fetch('@Url.Action("CreateLobby", "Home")' +
+            "?gameId=" + gameSelect.value + "&name=" + lobbyNameInput.value, { method: "POST" })
+            .then(response => response.json())
+            .then(data => {
+              window.location.href = '/Home/Games/' + data;
+            })
+            .catch(error => {
+              alert(error);
+            });
+    }
+    function logout() {
+        localStorage.setItem('username', "");
+        window.location.href = "/";
+    }
+</script>
+
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Game</th>
+            <th>Lobby name</th>
+            <th>Number of players</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (Itransition7.ViewModels.LobbyTable row in Model)
+        {
+            <tr>
+                <td>@row.GameId</td>
+                <td>@row.SessionName</td>
+                <td>@row.PlayerNumber/2</td>
+                <td>
+                    @Html.HiddenFor(modelItem => row.SessionId)
+                </td>
+                <td>
+                    <form method="get" action="/Home/Games/@row.SessionId">
+                        <button type="submit" class="btn btn-primary" @(row.PlayerNumber == 2 ? "disabled" : "")>Enter Lobby</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

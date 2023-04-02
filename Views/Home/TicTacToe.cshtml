@@ -1,0 +1,255 @@
+﻿@{
+    ViewData["Title"] = "Tic-Tac-Toe";
+}
+<script src="https://code.jquery.com/jquery-3.6.3.js"></script>
+<button class="btn btn-danger" id="disconnect-btn" onclick="leave()">Exit</button>
+
+<style>
+    .circle {
+        position: absolute;
+        top: 10%;
+        left: 10%;
+        width: 80%;
+        height: 80%;
+        pointer-events: none;
+        fill: none;
+        stroke: green;
+        stroke-width: 10;
+    }
+
+    .cross {
+        position: absolute;
+        top: 10%;
+        left: 10%;
+        width: 80%;
+        height: 80%;
+        pointer-events: none;
+    }
+
+    #gameField > div > div {
+        position: relative;
+    }
+</style>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-3">
+            <h3>Players in Lobby</h3>
+            <ul class="list-group" id="player-list"></ul>
+            <h6 id="waitField"></h6>
+            <button class="btn btn-primary" id="start" onclick="startGame()" style="display: none;">Start game</button>
+        </div>
+
+        <div class="col-md-9">
+            <h3>Tic Tac Toe</h3>
+            <div id="turn-indicator"></div>
+            <div id="gameField">
+                @for (int i = 0; i < 3; i++)
+                {
+                    <div style="display: flex; flex-direction: row;">
+                        @for (int j = 0; j < 3; ++j)
+                        {
+                            <div onclick="mark(this)" id="@(3 * i + j)" style="width: 100px; height: 100px; border: 1px solid black;"></div>
+                        }
+                    </div>
+                }
+            </div>
+            <h3 id="resultLine"></h3>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function leave() {
+            connection.stop().then(() => {
+            }).catch((error) => {
+                window.location.href = "/Home/Games";
+                console.error(`Error stopping connection: ${error}`);
+            });
+        };
+    </script>
+    <script>
+        var userName = localStorage.getItem('username');
+        var currentTurn;
+        var currentTurnSymbol = "cross";
+        var activeGame = false;
+        const maxPlayers = 2;
+
+        var url = window.location.pathname;
+        var sessionId = url.substring(url.lastIndexOf('/') + 1);
+        var connection = new signalR.HubConnectionBuilder()
+            .withUrl("/game?sessionId=" + sessionId + "&userName=" + userName)
+            .build();
+
+        connection.on("UserList", function (opponents) {
+            opponents.push({ userId: connection.connectionId, userName: userName });
+            var playerList = document.getElementById("player-list");
+            playerList.innerHTML = "";
+            opponents.forEach(function (player) {
+                var listItem = document.createElement("li");
+                listItem.classList.add("list-group-item");
+                listItem.textContent = player.userName;
+                listItem.id = player.userId;
+                playerList.appendChild(listItem);
+            });
+            if (playerList.childElementCount == maxPlayers) {
+                var wait = document.getElementById("waitField");
+                wait.innerText = "Wait for the host to start the game!";
+            }
+        });
+
+        connection.on("SessionNotFound", function () {
+            alert("Lobby does not exist!");
+            window.location.href = "/Home/Games";
+            //leave();
+        });
+        connection.on("FullSession", function () {
+            alert("Lobby is full!");
+            window.location.href = "/Home/Games";
+            //leave();
+        });
+
+        connection.on("UserConnected", function (user) {
+            var playerList = document.getElementById("player-list");
+            var listItem = document.createElement("li");
+            listItem.classList.add("list-group-item");
+            listItem.textContent = user.userName;
+            listItem.id = user.userId;
+            playerList.appendChild(listItem);
+
+            if (playerList.childElementCount == 2 && connection.connectionId == playerList.querySelector("li:first-child").id) {
+                var startButton = document.getElementById("start");
+                startButton.style.display = 'block';
+            } else if (playerList.childElementCount == 2) {
+                var wait = document.getElementById("waitField");
+                wait.innerText = "Wait for the host to start the game!";
+            }
+        });
+        connection.on("UserLeft", function (userId) {
+            var userLeftElement = document.getElementById(userId);
+            userLeftElement.remove();
+            var startButton = document.getElementById("start");
+            startButton.style.display = 'none';
+            var wait = document.getElementById("waitField");
+            wait.innerText = "";
+            if (activeGame) {
+                activeGame = false;
+                var res = document.getElementById("resultLine");
+                res.innerText = userName + " won since second player has left!";
+            }
+        });
+
+        // game flow
+        connection.on("GameStarted", function (startPlayer) {
+            flushGame();
+            currentTurnSymbol = "cross";
+            activeGame = true;
+            var startButton = document.getElementById("start");
+            startButton.style.display = 'none';
+            var wait = document.getElementById("waitField");
+            wait.innerText = "";
+            currentTurn = startPlayer;
+            const turnIndicator = document.getElementById("turn-indicator");
+            if (startPlayer == connection.connectionId) {
+                turnIndicator.innerText = "You turn";
+            } else {
+                turnIndicator.innerText = "Opponent's turn";
+            }
+        });
+        connection.on("MoveResult", function (winner, gameEnded, opponentMove) {
+            const playerList = document.querySelector('#player-list');
+            markCell(opponentMove.row, opponentMove.col);
+            if (winner != maxPlayers) {
+                activeGame = false;
+                var res = document.getElementById("resultLine");
+                const players = Array.from(playerList.querySelectorAll('li')).map(li => li.textContent);
+                res.innerText = players[winner] + " won!";
+            } else if (gameEnded) {
+                activeGame = false;
+                var res = document.getElementById("resultLine");
+                res.innerText = "Draw!";
+            } else {
+                const players = Array.from(playerList.querySelectorAll('li')).map(li => li.id);
+                if (players[0] == currentTurn) {
+                    currentTurn = players[1];
+                } else {
+                    currentTurn = players[0];
+                }
+            }
+            if (gameEnded) {
+                if (playerList.childElementCount == 2 && connection.connectionId == playerList.querySelector("li:first-child").id) {
+                    var startButton = document.getElementById("start");
+                    startButton.style.display = 'block';
+                } else if (playerList.childElementCount == 2) {
+                    var wait = document.getElementById("waitField");
+                    wait.innerText = "Wait for the host to start the game!";
+                }
+            }
+            const turnIndicator = document.getElementById("turn-indicator");
+            if (currentTurn == connection.connectionId) {
+                turnIndicator.innerText = "You turn";
+            } else {
+                turnIndicator.innerText = "Opponent's turn";
+            }
+            currentTurnSymbol = (currentTurnSymbol == "cross") ? "circle" : "cross";
+        });
+        connection.on("WrongMove", function (message) {
+            alert("Wrong move: " + message);
+        });
+        connection.on("GameNotFound", function (message) {
+            alert("Can't make turn: " + message);
+            leave();
+        });
+
+        connection.onclose(function () {
+            console.log("Onclose");
+            window.location.href = "/Home/Games";
+        });
+
+        connection.start().then(function () {
+            console.log("Reconnected to the hub");
+        }).catch(function (err) {
+            return console.error(err.toString());
+        });
+
+    </script>
+    <script>
+        function startGame() {
+            connection.invoke("StartGame").catch(err => function () { console.error(err); leave(); });
+        }
+    </script>
+    <script>
+        function mark(cell) {
+            if (cell.innerHTML == "" && activeGame && currentTurn == connection.connectionId) {
+                connection.invoke("MakeMove", { row: Math.floor(cell.id / 3), col: cell.id % 3 });
+                if (currentTurnSymbol == "cross") {
+                    cell.innerHTML = '<svg class="cross" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="80" height="80"><line x1="10" y1="10" x2="90" y2="90" stroke="red" stroke-width="10"/><line x1="90" y1="10" x2="10" y2="90" stroke="red" stroke-width="10"/></svg>';
+                } else {
+                    cell.innerHTML = '<svg class="circle" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40"/></svg>';
+                }
+            }
+        }
+        function markCell(row, col) {
+            const cells = Array.from(document.querySelectorAll('#gameField div div'));
+            var cell = cells[row * 3 + col];
+            if (currentTurnSymbol == "cross") {
+                cell.innerHTML = '<svg class="cross" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 '+cell.clientWidth+' '+cell.clientHeight+'"><line x1="10" y1="10" x2="'+(cell.clientWidth-10)+'" y2="'+(cell.clientHeight-10)+'" stroke="red" stroke-width="10"/><line x1="'+(cell.clientWidth-10)+'" y1="10" x2="10" y2="'+(cell.clientHeight-10)+'" stroke="red" stroke-width="10"/></svg>';
+            } else {
+                cell.innerHTML = '<svg class="circle" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 '+cell.clientWidth+' '+cell.clientHeight+'"><circle cx="'+(cell.clientWidth/2)+'" cy="'+(cell.clientHeight/2)+'" r="'+(cell.clientWidth/2-5)+'" stroke="green" stroke-width="10" fill="none"/></svg>';
+            }
+        }
+        function flushGame() {
+            const cells = Array.from(document.querySelectorAll('#gameField div div'));
+            for (var cell of cells) {
+                cell.innerHTML = "";
+            }
+            flushResult();
+        }
+        function flushResult() {
+            var res = document.getElementById("resultLine");
+            res.innerText = "";
+        }
+    </script>
+}
+
